@@ -41,18 +41,24 @@ import org.apache.rocketmq.store.config.FlushDiskType;
 import org.apache.rocketmq.store.util.LibC;
 import sun.nio.ch.DirectBuffer;
 
+/***
+ *对应一个二进制文件
+ */
 public class MappedFile extends ReferenceResource {
     public static final int OS_PAGE_SIZE = 1024 * 4;
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
-
+    /**占用内存的大小*/
     private static final AtomicLong TOTAL_MAPPED_VIRTUAL_MEMORY = new AtomicLong(0);
-
+    /**目录下二进制文件的数量*/
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
+    /**当前写指针的位置*/
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
     //ADD BY ChenYang
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
+    //当前被映射到内存的文件的大小
     protected int fileSize;
+    //当前正被映射到内存的文件通道
     protected FileChannel fileChannel;
     /**
      * Message will put to here first, and then reput to FileChannel if writeBuffer is not null.
@@ -60,8 +66,11 @@ public class MappedFile extends ReferenceResource {
     protected ByteBuffer writeBuffer = null;
     protected TransientStorePool transientStorePool = null;
     private String fileName;
+    /**文件的起始偏移量*/
     private long fileFromOffset;
+    /**文件句柄*/
     private File file;
+    //当前被映射到内存的文件的缓冲区
     private MappedByteBuffer mappedByteBuffer;
     private volatile long storeTimestamp = 0;
     private boolean firstCreateInQueue = false;
@@ -156,7 +165,7 @@ public class MappedFile extends ReferenceResource {
         this.file = new File(fileName);
         this.fileFromOffset = Long.parseLong(this.file.getName());
         boolean ok = false;
-
+        //确定目录存在
         ensureDirOK(this.file.getParent());
 
         try {
@@ -229,7 +238,7 @@ public class MappedFile extends ReferenceResource {
 
     public boolean appendMessage(final byte[] data) {
         int currentPos = this.wrotePosition.get();
-
+        //当前文件如果还有足够的空间可以满足该次写入
         if ((currentPos + data.length) <= this.fileSize) {
             try {
                 this.fileChannel.position(currentPos);
@@ -417,6 +426,8 @@ public class MappedFile extends ReferenceResource {
         return null;
     }
 
+    //释放资源，具体包括对MappedByteBuffer的释放（也就是直接内存的回收），
+    // 同时修改当前对象占用的内存
     @Override
     public boolean cleanup(final long currentRef) {
         if (this.isAvailable()) {
